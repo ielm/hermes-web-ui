@@ -1,0 +1,35 @@
+# Build artifacts
+target/
+Dockerfile
+.dockerignore
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Git files
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+docs/
+
+# Test artifacts
+tarpaulin-report.html
+cobertura.xml
+
+# Development files
+*.log
+.cargo/config.toml
