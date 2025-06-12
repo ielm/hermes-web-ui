@@ -6,11 +6,13 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
+import { eq, and, gt } from "drizzle-orm";
 
 import { db } from "~/server/db";
+import { sessions, users, type User, type Session } from "~/server/db/schema";
 
 /**
  * 1. CONTEXT
@@ -25,9 +27,46 @@ import { db } from "~/server/db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+  // Get the session from the headers
+  const token = opts.headers.get("authorization")?.replace("Bearer ", "");
+  
+  let session: (Session & { user: User }) | null = null;
+  
+  if (token) {
+    // Try to get the session
+    const [sessionData] = await db
+      .select({
+        session: sessions,
+        user: users,
+      })
+      .from(sessions)
+      .innerJoin(users, eq(sessions.userId, users.id))
+      .where(
+        and(
+          eq(sessions.token, token),
+          gt(sessions.expiresAt, new Date())
+        )
+      )
+      .limit(1);
+    
+    if (sessionData) {
+      session = {
+        ...sessionData.session,
+        user: sessionData.user,
+      };
+      
+      // Update last active
+      await db
+        .update(users)
+        .set({ lastActiveAt: new Date() })
+        .where(eq(users.id, sessionData.user.id));
+    }
+  }
+  
   return {
     db,
-    ...opts,
+    session,
+    headers: Object.fromEntries(opts.headers.entries()),
   };
 };
 
@@ -104,3 +143,23 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  * are logged in.
  */
 export const publicProcedure = t.procedure.use(timingMiddleware);
+
+/**
+ * Protected (authenticated) procedure
+ *
+ * If you want a query or mutation to ONLY be accessible to logged in users, use this. It verifies
+ * the session is valid and guarantees `ctx.session.user` is not null.
+ *
+ * @see https://trpc.io/docs/procedures
+ */
+export const protectedProcedure = t.procedure.use(timingMiddleware).use(({ ctx, next }) => {
+  if (!ctx.session?.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  return next({
+    ctx: {
+      // infers the `session` as non-nullable
+      session: { ...ctx.session, user: ctx.session.user },
+    },
+  });
+});

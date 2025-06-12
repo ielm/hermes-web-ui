@@ -8,5 +8,5 @@ export default {
   dbCredentials: {
     url: env.DATABASE_URL,
   },
-  tablesFilter: ["frontend_*"],
+  // No table prefix - we'll use the full schema
 } satisfies Config;
