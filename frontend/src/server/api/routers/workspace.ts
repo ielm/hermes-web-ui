@@ -2,12 +2,12 @@ import { z } from "zod";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { 
-  workspaces, 
-  workspaceMembers, 
+import {
+  workspaces,
+  workspaceMembers,
   executions,
   memoryEntries,
-  activityLogs
+  activityLogs,
 } from "~/server/db/schema";
 
 export const workspaceRouter = createTRPCRouter({
@@ -26,9 +26,7 @@ export const workspaceRouter = createTRPCRouter({
           eq(workspaceMembers.userId, ctx.session.user.id)
         )
       )
-      .where(
-        eq(workspaceMembers.userId, ctx.session.user.id)
-      )
+      .where(eq(workspaceMembers.userId, ctx.session.user.id))
       .orderBy(desc(workspaces.createdAt));
 
     return userWorkspaces.map(({ workspace, role }) => ({
@@ -67,7 +65,7 @@ export const workspaceRouter = createTRPCRouter({
         .limit(1);
 
       const isOwner = workspace.ownerId === ctx.session.user.id;
-      
+
       if (!isOwner && !member && workspace.visibility === "private") {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -77,7 +75,7 @@ export const workspaceRouter = createTRPCRouter({
 
       return {
         ...workspace,
-        role: isOwner ? "owner" : member?.role ?? "viewer",
+        role: isOwner ? "owner" : (member?.role ?? "viewer"),
       };
     }),
 
@@ -86,7 +84,11 @@ export const workspaceRouter = createTRPCRouter({
     .input(
       z.object({
         name: z.string().min(2).max(255),
-        slug: z.string().min(2).max(255).regex(/^[a-z0-9-]+$/),
+        slug: z
+          .string()
+          .min(2)
+          .max(255)
+          .regex(/^[a-z0-9-]+$/),
         description: z.string().optional(),
         visibility: z.enum(["private", "team", "public"]).default("private"),
       })
@@ -261,17 +263,17 @@ export const workspaceRouter = createTRPCRouter({
 
       // Get stats
       const [executionCount] = await ctx.db
-        .select({ count: sql`count(*)::int` })
+        .select({ count: sql<number>`count(*)::int` })
         .from(executions)
         .where(eq(executions.workspaceId, input.workspaceId));
 
       const [memoryCount] = await ctx.db
-        .select({ count: sql`count(*)::int` })
+        .select({ count: sql<number>`count(*)::int` })
         .from(memoryEntries)
         .where(eq(memoryEntries.workspaceId, input.workspaceId));
 
       const [memberCount] = await ctx.db
-        .select({ count: sql`count(*)::int` })
+        .select({ count: sql<number>`count(*)::int` })
         .from(workspaceMembers)
         .where(eq(workspaceMembers.workspaceId, input.workspaceId));
 

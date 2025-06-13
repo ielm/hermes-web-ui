@@ -1,12 +1,8 @@
 import { z } from "zod";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { 
-  memoryEntries, 
-  workspaceMembers, 
-  activityLogs 
-} from "~/server/db/schema";
+import { memoryEntries, workspaceMembers, activityLogs } from "~/server/db/schema";
 import { hermesClient } from "~/server/lib/hermes-client";
 
 export const memoryRouter = createTRPCRouter({
@@ -50,21 +46,30 @@ export const memoryRouter = createTRPCRouter({
 
         // Get local metadata for the results
         const hermesIds = results.results.map((r) => r.id);
+
+        // Handle case where there are no results
+        if (hermesIds.length === 0) {
+          return {
+            results: [],
+            total: 0,
+          };
+        }
+
         const localEntries = await ctx.db
           .select()
           .from(memoryEntries)
           .where(
             and(
               eq(memoryEntries.workspaceId, input.workspaceId),
-              sql`${memoryEntries.hermesMemoryId} = ANY(${hermesIds})`
+              sql`${memoryEntries.hermesMemoryId} = ANY(${sql.raw(
+                `ARRAY[${hermesIds.map((id) => `'${id}'`).join(",")}]`
+              )})`
             )
           );
 
         // Merge results with local data
         const merged = results.results.map((hermesResult) => {
-          const local = localEntries.find(
-            (e) => e.hermesMemoryId === hermesResult.id
-          );
+          const local = localEntries.find((e) => e.hermesMemoryId === hermesResult.id);
           return {
             ...hermesResult,
             localId: local?.id,
@@ -76,7 +81,7 @@ export const memoryRouter = createTRPCRouter({
           results: merged,
           total: results.results.length,
         };
-      } catch (error) {
+      } catch (_error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to search memories",
@@ -139,6 +144,13 @@ export const memoryRouter = createTRPCRouter({
           })
           .returning();
 
+        if (!entry) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create memory entry",
+          });
+        }
+
         // Log activity
         await ctx.db.insert(activityLogs).values({
           userId: ctx.session.user.id,
@@ -153,7 +165,7 @@ export const memoryRouter = createTRPCRouter({
         });
 
         return entry;
-      } catch (error) {
+      } catch (_error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to store memory",
@@ -198,7 +210,7 @@ export const memoryRouter = createTRPCRouter({
         });
 
         return results;
-      } catch (error) {
+      } catch (_error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to query memories",
@@ -230,11 +242,12 @@ export const memoryRouter = createTRPCRouter({
       }
 
       const namespaces = await ctx.db
-        .selectDistinct({ namespace: memoryEntries.namespace })
+        .select({ namespace: memoryEntries.namespace })
         .from(memoryEntries)
-        .where(eq(memoryEntries.workspaceId, input.workspaceId));
+        .where(eq(memoryEntries.workspaceId, input.workspaceId))
+        .groupBy(memoryEntries.namespace);
 
-      return namespaces.map((n) => n.namespace);
+      return namespaces.map((n) => n.namespace).filter(Boolean);
     }),
 
   // Delete memory entry

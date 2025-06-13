@@ -79,11 +79,7 @@ export const authRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const [user] = await ctx.db
-        .select()
-        .from(users)
-        .where(eq(users.email, input.email))
-        .limit(1);
+      const [user] = await ctx.db.select().from(users).where(eq(users.email, input.email)).limit(1);
 
       if (!user) {
         throw new TRPCError({
@@ -106,10 +102,7 @@ export const authRouter = createTRPCRouter({
       });
 
       // Update last active
-      await ctx.db
-        .update(users)
-        .set({ lastActiveAt: new Date() })
-        .where(eq(users.id, user.id));
+      await ctx.db.update(users).set({ lastActiveAt: new Date() }).where(eq(users.id, user.id));
 
       return {
         user,
@@ -120,9 +113,7 @@ export const authRouter = createTRPCRouter({
   // Sign out
   signOut: protectedProcedure.mutation(async ({ ctx }) => {
     // Delete the current session
-    await ctx.db
-      .delete(sessions)
-      .where(eq(sessions.token, ctx.session.token));
+    await ctx.db.delete(sessions).where(eq(sessions.token, ctx.session.token));
 
     return { success: true };
   }),
@@ -135,7 +126,7 @@ export const authRouter = createTRPCRouter({
         state: z.string().optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx: _ctx, input: _input }) => {
       // TODO: Implement WorkOS OAuth flow
       // This would exchange the code for user info via WorkOS API
       throw new TRPCError({
@@ -149,10 +140,7 @@ export const authRouter = createTRPCRouter({
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
 
-    await ctx.db
-      .update(sessions)
-      .set({ expiresAt })
-      .where(eq(sessions.id, ctx.session.id));
+    await ctx.db.update(sessions).set({ expiresAt }).where(eq(sessions.id, ctx.session.id));
 
     return { expiresAt };
   }),

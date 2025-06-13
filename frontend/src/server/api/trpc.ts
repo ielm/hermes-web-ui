@@ -29,9 +29,9 @@ import { sessions, users, type User, type Session } from "~/server/db/schema";
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   // Get the session from the headers
   const token = opts.headers.get("authorization")?.replace("Bearer ", "");
-  
+
   let session: (Session & { user: User }) | null = null;
-  
+
   if (token) {
     // Try to get the session
     const [sessionData] = await db
@@ -41,20 +41,15 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
       })
       .from(sessions)
       .innerJoin(users, eq(sessions.userId, users.id))
-      .where(
-        and(
-          eq(sessions.token, token),
-          gt(sessions.expiresAt, new Date())
-        )
-      )
+      .where(and(eq(sessions.token, token), gt(sessions.expiresAt, new Date())))
       .limit(1);
-    
+
     if (sessionData) {
       session = {
         ...sessionData.session,
         user: sessionData.user,
       };
-      
+
       // Update last active
       await db
         .update(users)
@@ -62,7 +57,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
         .where(eq(users.id, sessionData.user.id));
     }
   }
-  
+
   return {
     db,
     session,
@@ -84,8 +79,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
       ...shape,
       data: {
         ...shape.data,
-        zodError:
-          error.cause instanceof ZodError ? error.cause.flatten() : null,
+        zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
       },
     };
   },
@@ -130,7 +124,10 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
   const result = await next();
 
   const end = Date.now();
-  console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+  if (process.env.NODE_ENV === "development") {
+    // eslint-disable-next-line no-console
+    console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+  }
 
   return result;
 });

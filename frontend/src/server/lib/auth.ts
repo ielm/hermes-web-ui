@@ -12,6 +12,6 @@ export function generateApiKey(): { key: string; hash: string; prefix: string } 
   const key = `hk_${crypto.randomBytes(32).toString("hex")}`;
   const hash = hashApiKey(key);
   const prefix = key.substring(0, 10);
-  
+
   return { key, hash, prefix };
 }

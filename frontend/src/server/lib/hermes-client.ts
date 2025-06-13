@@ -48,20 +48,25 @@ interface MemoryQueryResponse {
 }
 
 class HermesClient {
-  private baseUrl: string;
-
   constructor() {
-    this.baseUrl = process.env.HERMES_BACKEND_URL ?? "http://localhost:8090";
+    // Base URL would be used in production for actual HTTP calls
+    // For now, using mock implementations
+    const _baseUrl = process.env.HERMES_BACKEND_URL ?? "http://localhost:8090";
+    void _baseUrl; // Acknowledge but not use in mocks
   }
 
-  async createExecution(request: ExecutionRequest): Promise<ExecutionResponse> {
+  async createExecution(_request: ExecutionRequest): Promise<ExecutionResponse> {
     // Mock implementation - replace with actual HTTP call
     return {
       executionId: `exec_${Date.now()}`,
     };
   }
 
-  async getExecution(executionId: string): Promise<any> {
+  async getExecution(executionId: string): Promise<{
+    executionId: string;
+    status: string;
+    output: string;
+  }> {
     // Mock implementation
     return {
       executionId,
@@ -72,11 +77,12 @@ class HermesClient {
 
   async cancelExecution(executionId: string): Promise<void> {
     // Mock implementation
-    console.log(`Cancelling execution ${executionId}`);
+    void executionId; // Acknowledge parameter
   }
 
   async searchMemory(request: MemorySearchRequest): Promise<MemorySearchResponse> {
     // Mock implementation
+    void request; // Acknowledge parameter
     return {
       results: [
         {
@@ -91,6 +97,7 @@ class HermesClient {
 
   async storeMemory(request: MemoryStoreRequest): Promise<MemoryStoreResponse> {
     // Mock implementation
+    void request; // Acknowledge parameter
     return {
       id: `mem_${Date.now()}`,
       success: true,
@@ -99,6 +106,7 @@ class HermesClient {
 
   async queryMemory(request: MemoryQueryRequest): Promise<MemoryQueryResponse> {
     // Mock implementation
+    void request; // Acknowledge parameter
     return {
       results: [],
       executionTimeMs: 42,
@@ -107,7 +115,7 @@ class HermesClient {
 
   async deleteMemory(memoryId: string): Promise<void> {
     // Mock implementation
-    console.log(`Deleting memory ${memoryId}`);
+    void memoryId; // Acknowledge parameter
   }
 }
 

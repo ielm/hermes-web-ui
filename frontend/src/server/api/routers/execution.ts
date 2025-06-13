@@ -13,9 +13,7 @@ export const executionRouter = createTRPCRouter({
         workspaceId: z.string().uuid(),
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
-        status: z
-          .enum(["pending", "running", "completed", "failed", "cancelled"])
-          .optional(),
+        status: z.enum(["pending", "running", "completed", "failed", "cancelled"]).optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -39,10 +37,7 @@ export const executionRouter = createTRPCRouter({
       }
 
       const where = input.status
-        ? and(
-            eq(executions.workspaceId, input.workspaceId),
-            eq(executions.status, input.status)
-          )
+        ? and(eq(executions.workspaceId, input.workspaceId), eq(executions.status, input.status))
         : eq(executions.workspaceId, input.workspaceId);
 
       const results = await ctx.db
@@ -53,15 +48,17 @@ export const executionRouter = createTRPCRouter({
         .limit(input.limit)
         .offset(input.offset);
 
-      const [{ count }] = await ctx.db
-        .select({ count: sql`count(*)::int` })
+      const [countResult] = await ctx.db
+        .select({ count: sql<number>`count(*)::int` })
         .from(executions)
         .where(where);
 
+      const totalCount = countResult?.count ?? 0;
+
       return {
         items: results,
-        total: count ?? 0,
-        hasMore: input.offset + results.length < (count ?? 0),
+        total: totalCount,
+        hasMore: input.offset + results.length < totalCount,
       };
     }),
 
@@ -139,7 +136,11 @@ export const executionRouter = createTRPCRouter({
       const [execution] = await ctx.db
         .insert(executions)
         .values({
-          ...input,
+          workspaceId: input.workspaceId,
+          title: input.title,
+          language: input.language,
+          code: input.code,
+          environment: input.environment,
           userId: ctx.session.user.id,
           status: "pending",
         })
